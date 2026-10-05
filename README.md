@@ -8,10 +8,10 @@ Este proyecto integra Visión Computacional, Mecatrónica, Robótica Móvil y Te
 
 El proceso logístico e industrial se divide en 4 etapas principales:
 
-1. **Clasificación por Visión Computacional:** Identificación y separación de monedas según su denominación y familia mediante algoritmos de procesamiento de imágenes.
-2. **Sistema de Embalaje:** Transferencia de monedas hacia vasos/empaques mediante banda transportadora y servomecanismos para la colocación de la tapa.
-3. **Transporte Autónomo (Minitanque):** Recepción de empaques en una carrocería tipo balde y desplazamiento hacia la meta a través de un circuito dinámico con obstáculos y pendientes de hasta 30°.
-4. **Monitoreo y Asistencia:** Dashboard con métricas del proceso en tiempo real y asistente inteligente (Chatbot) que narra los eventos del sistema por voz.
+1. **Clasificación por Visión Computacional:** Detección e identificación en tiempo real de las monedas colombianas (tanto de la familia antigua como de la nueva) clasificadas según su valor comercial mediante un modelo de visión artificial basado en **YOLO (You Only Look Once)**.
+2. **Sistema de Embalaje en Vasos:** Dosificación de las monedas clasificadas directamente dentro de vasos sobre la banda transportadora, seguido del sellado automático del vaso colocando su respectiva tapa mediante un servomecanismo.
+3. **Transporte Autónomo (Minitanque):** Recepción de los vasos cargados en la carrocería tipo balde y desplazamiento a través del circuito hacia la meta. *(Las especificaciones técnicas de tracción, peso y control se detallan en la sección siguiente)*.
+4. **Monitoreo y Asistente Expositivo:** Dashboard en tiempo real para visualizar métricas del proceso y un **Chatbot de Voz** cuyo objetivo exclusivo es exponer y explicar la presentación general del proyecto ante los evaluadores o público.
 
 ---
 
