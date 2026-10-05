@@ -1,6 +1,6 @@
 # 🪙 Sistema Automatizado de Clasificación de Monedas y Minitanque Autónomo Todoterreno
 
-Este proyecto integra Visión Computacional, Mecatrónica, Robótica Móvil y Telemetría en Tiempo Real para la clasificación, embalaje y transporte de monedas colombianas (diseño nuevo y antiguo).
+Este proyecto integra Visión Computacional, Mecatrónica, Robótica Móvil y Telemetría en Tiempo Real para la clasificación, embalaje y transporte de monedas colombianas.
 
 ---
 
