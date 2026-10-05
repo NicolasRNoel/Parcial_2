@@ -81,4 +81,4 @@ Para evitar que los 600 g detengan o deslicen el robot en la rampa, se implement
 ---
 
 ## 📌 Simualcion completa del proyecto final
-file:///D:/Documents/Proyecto%20predeterminado/clasificador_monedas_3d.html
+file:///D:/Documents/Proyecto%20predeterminado/clasificador-monedas-3d/clasificador_monedas_3d_offline.html
