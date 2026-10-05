@@ -10,8 +10,8 @@ El proceso logístico e industrial se divide en 4 etapas principales:
 
 1. **Clasificación por Visión Computacional:** Detección e identificación en tiempo real de las monedas colombianas (tanto de la familia antigua como de la nueva) clasificadas según su valor comercial mediante un modelo de visión artificial basado en **YOLO (You Only Look Once)**.
 2. **Sistema de Embalaje en Vasos:** Dosificación de las monedas clasificadas directamente dentro de vasos sobre la banda transportadora.
-3. **Transporte Autónomo (Minitanque):** Recepción de los vasos cargados en la carrocería tipo balde y desplazamiento a través del circuito hacia la meta. *(Las especificaciones técnicas de tracción, peso y control se detallan en la sección siguiente)*.
-4. **Monitoreo y Asistente Expositivo:** Dashboard en tiempo real para visualizar métricas del proceso y un **Chatbot de Voz** cuyo objetivo exclusivo es exponer y explicar la presentación general del proyecto ante los evaluadores o público.
+3. **Transporte Autónomo (Minitanque):** Recepción de los vasos cargados en la carrocería tipo balde y desplazamiento a través del circuito hacia la meta. *(Las especificaciones técnicas de tracción, peso y control se detallan en la sección siguiente*.
+4. **Monitoreo y Asistente Expositivo:** Dashboard en tiempo real para visualizar métricas del proceso y un **Chatbot de Voz** cuyo objetivo exclusivo es exponer y explicar la presentación general del proyecto.
 
 ---
 
