@@ -68,8 +68,7 @@ Para evitar que los 600 g detengan o deslicen el robot en la rampa, se implement
 
 ## 🖥️ Asistente de Voz
 
-* **Dashboard en Tiempo Real:** Interfaz gráfica para visualizar el conteo de monedas por denominación, velocidad de la banda transportadora y métricas del sistema.
-* **Chatbot Narrador del Proyecto (Explicación por Voz):** Módulo interactivo con síntesis de voz que actúa como guía explicativo del sistema. Su función es **describir la arquitectura, objetivos, funcionamiento técnico y fases del proyecto** para usuarios o evaluadores. *(Nota: El chatbot no realiza narración de eventos en tiempo real ni telemetría en vivo; se enfoca exclusivamente en la divulgación y explicación conceptual del proyecto).*
+* **Chatbot Narrador del Proyecto (Explicación por Voz):** Módulo interactivo con síntesis de voz que actúa como guía explicativo del sistema. Su función es **describir la arquitectura, objetivos, funcionamiento técnico y fases del proyecto**
 
 ---
 
