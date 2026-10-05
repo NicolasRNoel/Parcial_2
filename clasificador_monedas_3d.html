@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clasificador de Monedas Colombianas — Cinta + Servo + Carro de carga</title>
+<style>
+  :root{
+    --bg:#070a10; --panel:rgba(12,17,26,.82); --line:rgba(120,160,200,.18);
+    --txt:#dbe6f2; --dim:#7d8ea3; --cy:#22d3ee; --am:#f59e0b; --gn:#34d399;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font:13px/1.45 "Segoe UI",Inter,system-ui,sans-serif;overflow:hidden}
+  #escena{position:fixed;inset:0}
+  .panel{position:fixed;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    box-shadow:0 18px 50px rgba(0,0,0,.55)}
+
+  #titulo{top:18px;left:18px;padding:10px 13px;max-width:250px}
+  #titulo h1{margin:0;font-size:13px;letter-spacing:.3px;font-weight:650}
+  #titulo p{margin:4px 0 0;color:var(--dim);font-size:10px;line-height:1.35}
+  #fases{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
+  .fase{font-size:8.5px;letter-spacing:.4px;text-transform:uppercase;padding:2px 5px;
+    border-radius:20px;border:1px solid var(--line);color:var(--dim);transition:.25s}
+  .fase.on{background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.55);color:#a5f3fc}
+  .fase.hecha{color:var(--gn);border-color:rgba(52,211,153,.35)}
+
+  #tele{top:18px;right:18px;width:212px;padding:11px 13px}
+  #tele h2{margin:0 0 7px;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
+  .fila{display:flex;justify-content:space-between;align-items:baseline;
+    padding:2.5px 0;border-bottom:1px dashed rgba(120,160,200,.10)}
+  .fila:last-child{border:0}
+  .fila span{color:var(--dim);font-size:10px}
+  .fila b{font-weight:600;font-variant-numeric:tabular-nums;font-size:11.5px}
+  #confBar{height:3px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:7px;overflow:hidden}
+  #confFill{height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,#22d3ee,#34d399);
+    transition:width .25s}
+  #estadoTxt{margin-top:9px;font-size:10px;color:var(--am);display:flex;align-items:center;gap:6px}
+  #punto{width:6px;height:6px;border-radius:50%;background:var(--am);box-shadow:0 0 10px var(--am);
+    flex:0 0 auto}
+
+  #leyenda{bottom:18px;left:18px;padding:10px 12px;width:212px}
+  #leyenda h2{margin:0 0 7px;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
+  .mono{display:flex;align-items:center;gap:7px;padding:1.5px 0;font-size:10.5px;
+    font-variant-numeric:tabular-nums}
+  .pastilla{width:11px;height:11px;border-radius:50%;flex:0 0 auto;
+    box-shadow:inset 0 -2px 3px rgba(0,0,0,.45),0 0 8px currentColor}
+  .mono .n{margin-left:auto;color:var(--dim)}
+  #total{margin-top:8px;padding-top:7px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;font-size:11px}
+  #total b{color:var(--am);font-variant-numeric:tabular-nums}
+  #cargador{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);
+    z-index:9;transition:opacity .6s}
+  #cargador div{text-align:center;color:var(--dim)}
+  #cargador b{display:block;font-size:16px;color:var(--txt);margin-bottom:8px}
+</style>
+</head>
+<body>
+<div id="escena"></div>
+
+<div id="titulo" class="panel">
+  <h1>Clasificador de Monedas · Colombia</h1>
+  <p>1 unidad ≈ 10 cm · monedas ×3.2<br>Medidas de config/sistema.json</p>
+  <div id="fases">
+    <div class="fase">Tolva</div>
+    <div class="fase">Clasificar</div>
+    <div class="fase">Banda</div>
+    <div class="fase">Servo</div>
+    <div class="fase">Carro</div>
+  </div>
+</div>
+
+<div id="tele" class="panel">
+  <h2>Telemetría del clasificador</h2>
+  <div class="fila"><span>Denominación</span><b id="tDen">—</b></div>
+  <div class="fila"><span>Ø medido</span><b id="tDia">—</b></div>
+  <div class="fila"><span>Espesor</span><b id="tGru">—</b></div>
+  <div class="fila"><span>Tono / núcleo</span><b id="tTono">—</b></div>
+  <div class="fila"><span>Margen 2ª opción</span><b id="tMar">—</b></div>
+  <div class="fila"><span>Servo empuje</span><b id="tServo">0.0°</b></div>
+  <div class="fila"><span>Viajes entregados</span><b id="tViajes">0</b></div>
+  <div class="fila"><span>Total entregado</span><b id="tEntregado">$0</b></div>
+  <div id="confBar"><div id="confFill"></div></div>
+  <div id="estadoTxt"><i id="punto"></i><span id="tEst">Iniciando línea…</span></div>
+</div>
+
+<div id="leyenda" class="panel">
+  <h2>Carga del carro</h2>
+  <div class="mono g0"><i class="pastilla" style="background:#e2e8f0"></i>$50<i class="n" id="c50">0</i></div>
+  <div class="mono g1"><i class="pastilla" style="background:#cbd5e1"></i>$100<i class="n" id="c100">0</i></div>
+  <div class="mono g2"><i class="pastilla" style="background:#94a3b8"></i>$200<i class="n" id="c200">0</i></div>
+  <div class="mono g3"><i class="pastilla" style="background:#fbbf24"></i>$500<i class="n" id="c500">0</i></div>
+  <div class="mono g4"><i class="pastilla" style="background:radial-gradient(circle,#f0b429 55%,#cbd5e1 57%)"></i>$1.000<i class="n" id="c1000">0</i></div>
+  <div id="total"><span>Monedas · valor</span><b><span id="nCarro">0</span>/18 · <span id="vCarro">$0</span></b></div>
+</div>
+
+<div id="cargador"><div><b>Clasificador de monedas</b>cargando Three.js…</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ===========================================================================
+   CLASIFICADOR DE MONEDAS COLOMBIANAS — escena 3D autocontenida
+   ---------------------------------------------------------------------------
+   Flujo:  TOLVA -> CLASIFICAR (visión) -> BANDA -> SERVO -> CARRO DE CARGA
+   Medidas, masa, probabilidades y capacidad: sistema_monedas_esp32/config/sistema.json
+   Escala de escena: 1 unidad = 0.1 m   (banda de 9.4 u = 0.94 m, como la real)
+   =========================================================================== */
+
+/* ---------------------------------------------------------------- 1. DATOS */
+const DEN = [
+  { v:50,   dia:22.0, gr:3.6, tono:"plata", nucleo:0.00, prob:0.30,
+    cara:"#e2e8f0", canto:"#b9c4d0" },
+  { v:100,  dia:20.0, gr:3.6, tono:"plata", nucleo:0.00, prob:0.30,
+    cara:"#cbd5e1", canto:"#a3aebc" },
+  { v:200,  dia:24.5, gr:4.0, tono:"plata", nucleo:0.00, prob:0.20,
+    cara:"#94a3b8", canto:"#7d8896" },
+  { v:500,  dia:27.0, gr:4.4, tono:"plata", nucleo:0.00, prob:0.12,
+    cara:"#fbbf24", canto:"#c98f18" },
+  { v:1000, dia:26.6, gr:4.8, tono:"oro",   nucleo:0.54, prob:0.08,
+    cara:"#f0b429", canto:"#a97a12" },
+];
+/* Ruido del sensor (1 sigma). Con estos valores el par 500/1.000 se separa justo. */
+const RUIDO_DIA = 0.12, RUIDO_GR = 0.055, RUIDO_NUC = 0.030;
+const ESCALA_VIS = 3.2;                 // ampliación visual de las monedas
+const CAPACIDAD  = 18;                  // = config/sistema.json -> capacidad_monedas
+const HUECO_MONEDA = 1.05;              // separación mínima entre monedas en la banda
+
+/* Geometría de la planta (Y arriba, +X es el sentido del flujo) */
+const Y_BANDA  = 2.40;                  // altura de la superficie
+const X_TOLVA  = -9.15;                 // cámara de visión, sobre la cabeza de la banda
+const X_B0 = -9.40, X_B1 = 0.00;        // 9.4 u = 0.94 m  ->  banda corta
+const ANCHO_B  = 1.10;
+const V_BANDA  = 3.00;                  // 0.30 m/s (x10)
+const X_SERVO  = -0.78;
+const X_SALIDA = 0.32;
+const V_SALIDA = 4.20;
+const X_CARRO  = 2.55, Y_CARRO = 0.60;
+const PISO_CAJA = 0.68;
+const CAJA = { w:1.74, l:2.52, h:0.52 };
+
+/* -------------------------------------------------------------- 2. RENDER */
+const cont = document.getElementById('escena');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070a10);
+scene.fog = new THREE.FogExp2(0x070a10, 0.0125);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:"high-performance" });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+cont.appendChild(renderer.domElement);
+
+function ajustar(){
+  const w = cont.clientWidth, h = cont.clientHeight;
+  camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+}
+addEventListener('resize', ajustar);
+
+/* Entorno para los metales: "sala" de paneles emisivos -> PMREM */
+(function entorno(){
+  const pm = new THREE.PMREMGenerator(renderer);
+  const s  = new THREE.Scene();
+  const geo = new THREE.BoxGeometry();
+  const panel = (c,i,w,h,d,x,y,z,ry)=>{
+    const mat = new THREE.MeshBasicMaterial();
+    mat.color.setRGB(c[0]*i, c[1]*i, c[2]*i);
+    const m = new THREE.Mesh(geo, mat);
+    m.scale.set(w,h,d); m.position.set(x,y,z); if(ry) m.rotation.y = ry;
+    s.add(m);
+  };
+  panel([1.00,0.97,0.92], 3.4, 16,0.3,11,  0, 7.5, 0);        // techo cálido
+  panel([0.55,0.72,1.00], 1.6, 0.3,8,14,   0, 3.5,-8);        // pared fría
+  panel([0.85,0.90,1.00], 1.2, 0.3,7,12,   9, 3.0, 2, -1.1);  // lateral
+  panel([0.26,0.32,0.44], 0.5, 30,0.3,30,  0,-2.4, 0);        // suelo
+  const rt = pm.fromScene(s, 0.05);
+  scene.environment = rt.texture;
+  pm.dispose();
+})();
+
+scene.add(new THREE.AmbientLight(0x8fa6c4, 0.28));
+const key = new THREE.DirectionalLight(0xfff2df, 1.5);
+key.position.set(-6, 15, 10); key.castShadow = true;
+key.shadow.mapSize.set(2048,2048);
+key.shadow.camera.left = -20; key.shadow.camera.right = 20;
+key.shadow.camera.top  =  14; key.shadow.camera.bottom = -14;
+key.shadow.camera.far  =  50; key.shadow.bias = -0.0009;
+key.shadow.camera.updateProjectionMatrix();
+scene.add(key);
+const relleno = new THREE.DirectionalLight(0x5f86c9, 0.42);
+relleno.position.set(10, 6, -12); scene.add(relleno);
+
+/* ------------------------------------------------------------ 3. UTILIDADES */
+const MAT = {
+  acero   : new THREE.MeshStandardMaterial({ color:0x9aa7b4, metalness:.94, roughness:.30 }),
+  claro   : new THREE.MeshStandardMaterial({ color:0xd8e2ee, metalness:.92, roughness:.22 }),
+  oscuro  : new THREE.MeshStandardMaterial({ color:0x39424e, metalness:.85, roughness:.45 }),
+  marco   : new THREE.MeshStandardMaterial({ color:0x2b3440, metalness:.75, roughness:.48 }),
+  pista   : new THREE.MeshStandardMaterial({ color:0x1b1f26, metalness:.55, roughness:.62 }),
+  chasis  : new THREE.MeshStandardMaterial({ color:0x3f4c41, metalness:.70, roughness:.52 }),
+  ambar   : new THREE.MeshStandardMaterial({ color:0xf59e0b, metalness:.55, roughness:.34,
+                                             emissive:0xf59e0b, emissiveIntensity:.50 }),
+  vidrio  : new THREE.MeshPhysicalMaterial({ color:0xbfe6f5, metalness:0, roughness:.07,
+               transmission:.90, thickness:.35, transparent:true, opacity:.40 }),
+};
+
+function caja(w,h,d,mat,x,y,z,padre){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true;
+  (padre||scene).add(m); return m;
+}
+function cilindro(rt,rb,h,seg,mat,x,y,z,padre){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), mat);
+  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true;
+  (padre||scene).add(m); return m;
+}
+function texDeCanvas(w,h,fn){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  fn(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+const texHalo = texDeCanvas(128,128,(g)=>{
+  const r = g.createRadialGradient(64,64,0,64,64,64);
+  r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.26,'rgba(255,255,255,.40)');
+  r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=r; g.fillRect(0,0,128,128);
+});
+function halo(color,size,x,y,z,op,padre){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:texHalo, color:color,
+    blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:op }));
+  s.scale.set(size,size,1); s.position.set(x,y,z); (padre||scene).add(s); return s;
+}
+const $ = s=>document.querySelector(s);
+
+/* ------------------------------------------------- 4. CLASIFICACIÓN (visión) */
+/* En vez de "saber" qué moneda es, se miden sus rasgos y se decide por distancia
+   al centroide más cercano (nearest-centroid). Es lo que hace un clasificador real. */
+function gauss(s){
+  let u=0,v=0; while(!u) u=Math.random(); while(!v) v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)*s;
+}
+function sensorear(d){
+  return {
+    dia: d.dia + gauss(RUIDO_DIA),
+    gr:  d.gr  + gauss(RUIDO_GR),
+    oro: d.tono === "oro",
+    nucleo: (d.tono==="oro" ? d.nucleo + gauss(RUIDO_NUC) : Math.abs(gauss(RUIDO_NUC))),
+  };
+}
+function clasificar(m){
+  const costos = DEN.map(d=>{
+    let c = Math.pow((m.dia-d.dia)/0.55, 2) + Math.pow((m.gr-d.gr)/0.20, 2);
+    c += (m.oro === (d.tono==="oro")) ? 0 : 7.0;                 // el tono decide mucho
+    c += Math.pow((m.nucleo-d.nucleo)/0.13, 2);
+    return c;
+  });
+  const ord = costos.map((c,i)=>({c,i})).sort((a,b)=>a.c-b.c);
+  const d  = DEN[ord[0].i], d2 = DEN[ord[1].i];
+  const conf = Math.max(0, Math.min(.999, 1 - Math.exp(-(costos[ord[1].i]-costos[ord[0].i])*0.55)));
+  const margenMM = Math.hypot(d.dia-d2.dia, d.gr-d2.gr)*10;    // 0.1 mm
+  return { d, conf, margenMM, rival:d2 };
+}
+
+/* ------------------------------------------------------- 5. CARA DE MONEDA */
+function caraMoneda(d){
+  const S=256, cv=document.createElement('canvas'); cv.width=cv.height=S;
+  const g=cv.getContext('2d'), c=S/2;
+  if(d.tono==="oro"){
+    const rg=g.createRadialGradient(c,c*.8,4,c,c,c);
+    rg.addColorStop(0,"#ffe08a"); rg.addColorStop(.455,"#e8ae2e");
+    rg.addColorStop(.475,"#e2e8ee"); rg.addColorStop(.93,"#aab6c2"); rg.addColorStop(1,"#8b98a6");
+    g.fillStyle=rg;
+  }else{
+    const rg=g.createRadialGradient(c,c*.8,4,c,c,c);
+    rg.addColorStop(0,"#f4f8fc"); rg.addColorStop(.55,d.cara); rg.addColorStop(1,"#7d8896");
+    g.fillStyle=rg;
+  }
+  g.beginPath(); g.arc(c,c,c-3,0,7); g.fill();
+  g.strokeStyle="rgba(255,255,255,.30)"; g.lineWidth=3;
+  g.beginPath(); g.arc(c,c,c-11,0,7); g.stroke();
+  g.strokeStyle="rgba(0,0,0,.24)"; g.lineWidth=2;
+  g.beginPath(); g.arc(c,c,c-22,0,7); g.stroke();
+  const txt="REPUBLICA DE COLOMBIA";
+  g.fillStyle = d.tono==="oro" ? "#6b4a06" : "#39424e";
+  g.font="600 15px Georgia,serif"; g.textAlign="center"; g.textBaseline="middle";
+  for(let i=0;i<txt.length;i++){
+    const a=(i/txt.length)*Math.PI*2 - Math.PI/2;
+    g.save(); g.translate(c+Math.cos(a)*(c-34), c+Math.sin(a)*(c-34)); g.rotate(a+Math.PI/2);
+    g.fillText(txt[i],0,0); g.restore();
+  }
+  g.fillStyle = d.tono==="oro" ? "#5c3f04" : "#2a323c";
+  g.font="700 60px Georgia,serif"; g.fillText(String(d.v), c, c-2);
+  g.font="600 16px Georgia,serif"; g.fillText("PESOS", c, c+36);
+  const t=new THREE.CanvasTexture(cv); t.encoding=THREE.sRGBEncoding;
+  t.anisotropy=Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+const geoCache = {};
+function geoMoneda(d){
+  if(geoCache[d.v]) return geoCache[d.v];
+  const radio = (d.dia/1000)*10*0.5*ESCALA_VIS;      // m -> u (1u=0.1m), × ampliación visual
+  const alto  = (d.gr /1000)*10*ESCALA_VIS;
+  const geo = new THREE.CylinderGeometry(radio, radio, alto, 40, 1, false);
+  const lado = new THREE.MeshStandardMaterial({ color:d.canto, metalness:.95, roughness:.34 });
+  const cara = new THREE.MeshStandardMaterial({ map:caraMoneda(d), metalness:.88, roughness:.30 });
+  const rad  = new THREE.TorusGeometry(radio*0.99, alto*0.30, 8, 40);
+  const matR = new THREE.MeshStandardMaterial({ color:d.canto, metalness:.98, roughness:.20 });
+  geoCache[d.v] = { geo, mats:[lado,cara,cara], rad, matR, radio, alto };
+  return geoCache[d.v];
+}
+function meshMoneda(d){
+  const G = geoMoneda(d), g = new THREE.Group();
+  const m = new THREE.Mesh(G.geo, G.mats); m.castShadow=true; m.receiveShadow=true; g.add(m);
+  const t = new THREE.Mesh(G.rad, G.matR);
+  t.rotation.x = Math.PI/2; t.castShadow = true; g.add(t);
+  g.userData = { d:d, alto:G.alto, radio:G.radio };
+  return g;
+}
+
+/* ---------------------------------------------------------- 6. SUELO / PISO */
+(function(){
+  const tex = texDeCanvas(1024,1024,(g,w,h)=>{
+    g.fillStyle="#0b0f16"; g.fillRect(0,0,w,h);
+    g.strokeStyle="rgba(110,150,195,.11)"; g.lineWidth=2;
+    for(let i=0;i<=16;i++){ const p=i*w/16;
+      g.beginPath(); g.moveTo(p,0); g.lineTo(p,h); g.stroke();
+      g.beginPath(); g.moveTo(0,p); g.lineTo(w,p); g.stroke(); }
+    g.strokeStyle="rgba(110,150,195,.045)"; g.lineWidth=1;
+    for(let i=0;i<=64;i++){ const p=i*w/64;
+      g.beginPath(); g.moveTo(p,0); g.lineTo(p,h); g.stroke();
+      g.beginPath(); g.moveTo(0,p); g.lineTo(w,p); g.stroke(); }
+  });
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(5,5);
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(140,140),
+    new THREE.MeshStandardMaterial({ map:tex, metalness:.30, roughness:.74 }));
+  piso.rotation.x = -Math.PI/2; piso.receiveShadow = true; scene.add(piso);
+})();
+
+/* ------------------------------------------------------------- 7. LA BANDA */
+const L_BANDA = X_B1 - X_B0, C_BANDA = (X_B0+X_B1)/2;
+const bandaG = new THREE.Group(); scene.add(bandaG);
+
+const texBanda = texDeCanvas(128,128,(g)=>{
+  g.fillStyle="#161a21"; g.fillRect(0,0,128,128);
+  g.fillStyle="#1f252e"; for(let i=-1;i<3;i++) g.fillRect(i*64-30, 0, 12, 128);
+  g.fillStyle="rgba(0,0,0,.36)";      for(let i=0;i<8;i++)  g.fillRect(0, i*16+6, 128, 4);
+  g.fillStyle="rgba(150,180,215,.07)"; g.fillRect(0,0,128,3);
+});
+texBanda.wrapS = texBanda.wrapT = THREE.RepeatWrapping; texBanda.repeat.set(L_BANDA/0.9, 1);
+const supBanda = new THREE.Mesh(new THREE.PlaneGeometry(L_BANDA, ANCHO_B),
+  new THREE.MeshStandardMaterial({ map:texBanda, metalness:.18, roughness:.78 }));
+supBanda.rotation.x = -Math.PI/2;
+supBanda.position.set(C_BANDA, Y_BANDA, 0);
+supBanda.receiveShadow = true; bandaG.add(supBanda);
+
+const texRet = texDeCanvas(128,128,(g)=>{
+  g.fillStyle="#0e1116"; g.fillRect(0,0,128,128);
+  g.fillStyle="rgba(255,255,255,.035)"; for(let i=0;i<8;i++) g.fillRect(0, i*16+6, 128, 4);
+});
+texRet.wrapS = THREE.RepeatWrapping; texRet.repeat.set(L_BANDA/0.9, 1);
+const retBanda = new THREE.Mesh(new THREE.PlaneGeometry(L_BANDA, ANCHO_B),
+  new THREE.MeshStandardMaterial({ map:texRet, metalness:.10, roughness:.90 }));
+retBanda.rotation.x = Math.PI/2;
+retBanda.position.set(C_BANDA, Y_BANDA-0.40, 0); bandaG.add(retBanda);
+
+/* bastidor, walleditos y patas */
+caja(L_BANDA+0.5, 0.16, 0.14, MAT.marco, C_BANDA, Y_BANDA-0.20,  ANCHO_B/2+0.09, bandaG);
+caja(L_BANDA+0.5, 0.16, 0.14, MAT.marco, C_BANDA, Y_BANDA-0.20, -ANCHO_B/2-0.09, bandaG);
+[ANCHO_B/2+0.055, -ANCHO_B/2-0.055].forEach(z=>{
+  caja(L_BANDA, 0.34, 0.055, MAT.claro, C_BANDA, Y_BANDA+0.17, z, bandaG);
+});
+for(let i=0;i<5;i++){
+  const x = X_B0 + 0.55 + i*(L_BANDA-1.1)/4;
+  [-1,1].forEach(s=>{
+    caja(0.13, Y_BANDA-0.30, 0.13, MAT.marco, x, (Y_BANDA-0.30)/2, s*(ANCHO_B/2+0.06), bandaG);
+    caja(0.36, 0.07, 0.36, MAT.oscuro, x, 0.035, s*(ANCHO_B/2+0.06), bandaG);
+  });
+  if(i>0 && i<4) cilindro(0.075,0.075,ANCHO_B,14,MAT.acero,x,Y_BANDA-0.22,0,bandaG).rotation.x = Math.PI/2;
+}
+const rodillos = [0,1].map(k=>{
+  const r = cilindro(0.17,0.17,ANCHO_B+0.10,24,MAT.acero,
+                     k ? X_B1-0.10 : X_B0+0.10, Y_BANDA-0.17, 0, bandaG);
+  r.rotation.x = Math.PI/2; return r;
+});
+
+/* --------------------------------------------------- 8. TOLVA + CÁMARA DE VISIÓN */
+const tolva = new THREE.Group(); tolva.position.set(X_TOLVA,0,0); scene.add(tolva);
+
+function embudo(y0,y1,r0,r1,padre){          // r0 = radio de arriba, r1 = radio de abajo
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, y0-y1, 4, 1, true), MAT.oscuro);
+  m.position.y = (y0+y1)/2; m.rotation.y = Math.PI/4;
+  m.castShadow = true; m.receiveShadow = true; padre.add(m); return m;
+}
+embudo(5.30, 4.50, 1.45, 0.42, tolva);
+embudo(4.50, 3.68, 0.42, 0.38, tolva);
+cilindro(1.50,1.50,0.10,4,MAT.acero,0,5.32,0,tolva).rotation.y = Math.PI/4;
+/* pilares del embudo */
+[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([a,b])=>{
+  const p = cilindro(0.055,0.055,2.3,10,MAT.acero, a*1.20, 4.30, b*1.20, tolva);
+});
+
+const camara = new THREE.Group(); camara.position.set(0,3.05,0); tolva.add(camara);
+caja(1.16,1.28,0.06,MAT.vidrio, 0,0, 0.44, camara);
+caja(1.16,1.28,0.06,MAT.vidrio, 0,0,-0.44, camara);
+caja(0.06,1.28,0.94,MAT.vidrio, 0.58,0,0, camara);
+caja(0.06,1.28,0.94,MAT.vidrio,-0.58,0,0, camara);
+caja(1.22,0.08,0.96,MAT.marco, 0, 0.66, 0, camara);        // techo
+caja(1.22,0.10,0.96,MAT.marco, 0,-0.64, 0, camara);        // suelo con trampilla
+
+const hazMat = new THREE.MeshBasicMaterial({ color:0x22d3ee, transparent:true,
+  opacity:.30, blending:THREE.AdditiveBlending, depthWrite:false });
+const haz = new THREE.Mesh(new THREE.BoxGeometry(1.04,0.014,0.82), hazMat);
+haz.position.y = 0.30; camara.add(haz);
+halo(0x22d3ee, 2.2, X_TOLVA, 3.35, 0, .45);
+
+[-1,1].forEach(s=>{
+  caja(0.26,0.24,0.34, MAT.marco, s*0.76, 0.16, 0, camara);
+  const lente = cilindro(0.085,0.085,0.18,20,
+    new THREE.MeshStandardMaterial({ color:0x0b2b33, metalness:.6, roughness:.15,
+      emissive:0x22d3ee, emissiveIntensity:1.8 }), s*0.76, 0.16, 0, camara);
+  lente.rotation.z = Math.PI/2;
+  halo(0x22d3ee, 0.72, X_TOLVA+s*0.76, 3.21, 0, .85);
+});
+/* compuerta giratoria (pestillo que cicla, como el del contador real) */
+const compuerta = new THREE.Group(); compuerta.position.set(0,-0.58,0); tolva.add(compuerta);
+const hoja = caja(0.94,0.05,0.62, MAT.ambar, 0.42,0,0, compuerta);
+cilindro(0.055,0.055,0.92,12,MAT.acero, -0.44,0,0, compuerta).rotation.x = Math.PI/2;
+caja(0.32,0.32,0.32, MAT.oscuro, -0.64,0.06,0.52, tolva);
+halo(0xf59e0b, 0.60, X_TOLVA-0.64, 3.11, 0.52, .7);
+/* patas del módulo de tolva */
+[2,6].forEach(x=>{
+  caja(0.14, Y_BANDA-0.28, 0.14, MAT.marco, x, (Y_BANDA-0.28)/2, -0.82, tolva);
+  caja(0.14, Y_BANDA-0.28, 0.14, MAT.marco, x, (Y_BANDA-0.28)/2,  0.82, tolva);
+});
+
+/* ---------------------------------------------------- 9. PANEL HOLO (visión) */
+const holoCv=document.createElement('canvas'); holoCv.width=512; holoCv.height=256;
+const holoCtx=holoCv.getContext('2d');
+const holoTex=new THREE.CanvasTexture(holoCv); holoTex.encoding=THREE.sRGBEncoding;
+const holo=new THREE.Mesh(new THREE.PlaneGeometry(3.8,1.9),
+  new THREE.MeshBasicMaterial({ map:holoTex, transparent:true,
+    blending:THREE.AdditiveBlending, depthWrite:false, opacity:.92 }));
+holo.position.set(X_TOLVA+3.30, 5.10, 0); scene.add(holo);
+
+function pintarHolo(m,r){
+  const g = holoCtx;
+  g.clearRect(0,0,512,256);
+  g.fillStyle="rgba(6,20,30,.52)"; g.fillRect(0,0,512,256);
+  g.strokeStyle="rgba(34,211,238,.7)"; g.lineWidth=2; g.strokeRect(3,3,506,250);
+  g.fillStyle="#7dd3fc"; g.font="600 15px Segoe UI,sans-serif"; g.textAlign="left";
+  g.fillText("ESTACIÓN DE VISIÓN ARTIFICIAL", 18, 28);
+  g.fillStyle="rgba(34,211,238,.25)"; g.fillRect(18,36,476,1);
+  if(!m){
+    g.fillStyle="#43607a"; g.font="15px Segoe UI,sans-serif";
+    g.fillText("esperando moneda…",18,96); holoTex.needsUpdate=true; return;
+  }
+  const et = [
+    ["Ø MEDIDO",      m.dia.toFixed(2)+" mm"],
+    ["ESPESOR",       m.gr.toFixed(2)+" mm"],
+    ["TONO / NÚCLEO", (m.oro ? "ORO · "+Math.round(m.nucleo*100)+"%"
+                             : "PLATA · "+Math.round(m.nucleo*100)+"%")],
+    ["MARGEN 2ª",     r ? r.margenMM.toFixed(1)+" (0.1 mm)" : "—"],
+  ];
+  g.font="14px Segoe UI,sans-serif";
+  et.forEach((e,i)=>{ const y=66+i*27;
+    g.fillStyle="#6f8ba6"; g.fillText(e[0],18,y);
+    g.fillStyle="#dbeafe"; g.textAlign="right"; g.fillText(e[1],494,y); g.textAlign="left"; });
+  g.fillStyle="rgba(34,211,238,.25)"; g.fillRect(18,180,476,1);
+  if(r){
+    g.fillStyle="#34d399"; g.font="700 40px Segoe UI,sans-serif";
+    g.fillText("$"+r.d.v.toLocaleString("es-CO"), 18, 224);
+    g.textAlign="right";
+    g.fillStyle="#7dd3fc"; g.font="600 16px Segoe UI,sans-serif";
+    g.fillText("CONF "+ (r.conf*100).toFixed(1)+"%", 494, 206);
+    g.fillStyle="#64748b"; g.font="13px Segoe UI,sans-serif";
+    g.fillText("2ª opción $"+r.rival.v.toLocaleString("es-CO"), 494, 228);
+    g.textAlign="left";
+  }
+  holoTex.needsUpdate = true;
+}
+pintarHolo(null,null);
+
+/* ------------------------------------------------------------- 10. SERVO */
+const RECOGIDA = 0.62, EXTENSION = 1.30;      // carrera de la pala
+const servoG = new THREE.Group(); servoG.position.set(X_SERVO, Y_BANDA+0.02, 0); scene.add(servoG);
+caja(1.90,0.09,0.14, MAT.acero, 0.45, 0.10,  0.64, servoG);     // carril
+caja(1.90,0.09,0.14, MAT.acero, 0.45, 0.10, -0.64, servoG);
+caja(0.18,0.66,1.44, MAT.marco, -0.56, 0.18, 0, servoG);         // soporte
+caja(0.46,0.46,0.46, MAT.oscuro, -0.60, 0.44,  0.90, servoG);    // cuerpo del servo
+caja(0.30,0.10,0.30, MAT.acero,  -0.60, 0.70,  0.90, servoG);
+for(let i=0;i<4;i++) caja(0.52,0.03,0.52, MAT.acero, -0.60, 0.26+i*0.10, 0.90, servoG);
+const bocina = caja(0.42,0.05,0.05, MAT.ambar, -0.60, 0.52, 0.64, servoG);
+const ledServo = caja(0.07,0.07,0.03,
+  new THREE.MeshStandardMaterial({ color:0x0d2b12, emissive:0x34d399,
+    emissiveIntensity:2.0, metalness:.3, roughness:.3 }), -0.60, 0.62, 1.14, servoG);
+halo(0xf59e0b, 0.90, X_SERVO-0.60, Y_BANDA+0.64, 0.90, .8);
+
+const brazo = new THREE.Group(); servoG.add(brazo);
+brazo.position.x = -RECOGIDA;
+caja(0.10, 1.40, 1.14, MAT.claro, 0.00, 0.42, 0, brazo);       // placa
+caja(0.30, 0.62, 1.14, MAT.ambar, 0.20, 0.36, 0, brazo);       // pala
+caja(0.08, 0.14, 1.02, MAT.acero, 0.36, 0.62, 0, brazo);       // borde superior
+const biela = caja(0.06,0.06,0.72, MAT.acero, -RECOGIDA, 0.16, 0.30, servoG);
+
+/* ------------------------------------------------- 11. CARRO DE CARGA (TANQUE) */
+const carro = new THREE.Group(); carro.position.set(X_CARRO,0,0); scene.add(carro);
+
+/* pista de tanque: eslabones instanciados sobre un circuito "estadio" */
+function circuito(s,S,r){
+  const P = 2*S + 2*Math.PI*r; s = ((s%P)+P)%P;
+  const arco = Math.PI*r;
+  if(s < S)          return { x:-S/2+s, y:-r, a:0 };
+  if(s < S+arco){ const th=-Math.PI/2+(s-S)/r; return { x:S/2+r*Math.cos(th), y:r*Math.sin(th), a:th }; }
+  if(s < 2*S+arco){ const t=s-S-arco;          return { x:S/2-t, y:r, a:Math.PI }; }
+  const th = Math.PI/2 + (s-2*S-arco)/r;
+  return { x:-S/2+r*Math.cos(th), y:r*Math.sin(th), a:th };
+}
+const TR = { largo:3.20, radio:0.52, ancho:0.66, n:48 };
+function pista(xLocal){
+  const g = new THREE.Group();
+  g.position.set(xLocal, TR.radio, 0);
+  g.rotation.y = -Math.PI/2;                       // eje local X -> Z del mundo
+  carro.add(g);
+  const S = TR.largo - 2*TR.radio, P = 2*S + 2*Math.PI*TR.radio, paso = P/TR.n;
+  const im = new THREE.InstancedMesh(new THREE.BoxGeometry(paso*1.08, 0.10, TR.ancho),
+                                     MAT.pista, TR.n);
+  im.castShadow = true; im.receiveShadow = true; g.add(im);
+  const ruedas = [];
+  const rueda = (px,pr,mat,dientes)=>{
+    const r = cilindro(pr,pr,TR.ancho*0.80,20,mat||MAT.oscuro,px,0,0,g);
+    r.rotation.x = Math.PI/2; ruedas.push(r);
+    if(dientes){
+      const gd = new THREE.Group(); gd.position.set(px,0,0); g.add(gd);
+      for(let i=0;i<dientes;i++){
+        const a = i/dientes*Math.PI*2;
+        const d = caja(pr*0.30,pr*0.34,TR.ancho*0.82, MAT.acero,
+                       Math.cos(a)*pr*1.02, Math.sin(a)*pr*1.02, 0, gd);
+        d.rotation.z = a;
+      }
+      ruedas.push(gd);
+    }
+  };
+  rueda(-S/2, TR.radio-0.10, MAT.oscuro, 12);      // sprocket motriz
+  rueda( S/2, TR.radio-0.14);                      // tensor delantero
+  for(let i=0;i<4;i++){                            // rodillos de apoyo
+    const rw = TR.radio*0.54;
+    const r = cilindro(rw,rw,TR.ancho*0.72,16,MAT.oscuro,
+                       -S/2+(i+0.5)*S/4, -TR.radio+0.055+rw, 0, g);
+    r.rotation.x = Math.PI/2; ruedas.push(r);
+  }
+  for(let i=0;i<2;i++){                            // rodillos de retorno
+    const r = cilindro(0.11,0.11,TR.ancho*0.62,14,MAT.oscuro, -S/4+i*S/2, TR.radio-0.13, 0, g);
+    r.rotation.x = Math.PI/2; ruedas.push(r);
+  }
+  caja(S*0.60, 0.07, TR.ancho*1.06, MAT.chasis, -S*0.06, TR.radio+0.17, 0, g);   // patín
+  return { g, im, ruedas, S, off:0 };
+}
+const pistaIzq = pista(-0.96), pistaDer = pista(0.96);
+
+/* plataforma y cajón */
+const lineaCarga = new THREE.Group(); carro.add(lineaCarga);
+caja(2.24,0.26,2.96, MAT.chasis,  0, Y_CARRO-0.13, 0, lineaCarga);
+caja(2.34,0.09,3.06, MAT.oscuro,  0, Y_CARRO-0.02, 0, lineaCarga);
+caja(CAJA.w, CAJA.h, 0.08, MAT.oscuro, 0, PISO_CAJA+CAJA.h/2, -CAJA.l/2, lineaCarga);
+caja(CAJA.w, CAJA.h, 0.08, MAT.oscuro, 0, PISO_CAJA+CAJA.h/2,  CAJA.l/2, lineaCarga);
+caja(0.08, CAJA.h, CAJA.l, MAT.oscuro, -CAJA.w/2, PISO_CAJA+CAJA.h/2, 0, lineaCarga);
+caja(0.08, CAJA.h, CAJA.l, MAT.oscuro,  CAJA.w/2, PISO_CAJA+CAJA.h/2, 0, lineaCarga);
+caja(CAJA.w-0.18, 0.05, CAJA.l-0.18, MAT.marco, 0, PISO_CAJA+0.025, 0, lineaCarga);
+/* tubulares superiores: dan lectura de "carro" y no tapan las monedas */
+[-CAJA.l/2, CAJA.l/2].forEach(z=>{
+  const b=caja(CAJA.w+0.16,0.06,0.06,MAT.claro, 0, PISO_CAJA+CAJA.h+0.10, z, lineaCarga);
+  caja(0.06,0.16,0.06,MAT.claro, -CAJA.w/2-0.05, PISO_CAJA+CAJA.h+0.03, z, lineaCarga);
+  caja(0.06,0.16,0.06,MAT.claro,  CAJA.w/2+0.05, PISO_CAJA+CAJA.h+0.03, z, lineaCarga);
+});
+[-CAJA.w/2-0.05, CAJA.w/2+0.05].forEach(x=>{
+  caja(0.06,0.06,CAJA.l,MAT.claro, x, PISO_CAJA+CAJA.h+0.10, 0, lineaCarga);
+});
+/* panel de control con un piloto por denominación */
+caja(0.16,0.64,CAJA.l*0.9, MAT.chasis, -CAJA.w/2-0.11, Y_CARRO+0.38, 0, lineaCarga);
+const pilotos = [];
+for(let i=0;i<5;i++){
+  const z = (i-2)*(CAJA.l*0.82/5);
+  const mat = new THREE.MeshStandardMaterial({ color:0x14181f, metalness:.3, roughness:.4,
+    emissive:new THREE.Color(DEN[i].cara), emissiveIntensity:0 });
+  caja(0.06,0.12,0.34, mat, -CAJA.w/2-0.21, Y_CARRO+0.52, z, lineaCarga);
+  pilotos.push(mat);
+}
+/* (sin baliza: el carro no lleva ninguna luz) */
+
+/* ------------------------------------------------- 12. RUTA, OBSTÁCULOS Y META */
+/* El carro es un vehículo con orugas: sólo avanza y gira sobre su propio eje.
+   Para llegar a la meta esquivando los obstáculos hace falta un planificador,
+   igual que en el sistema real (core/planificador.py -> A*).                   */
+
+const ARENA = { x0:-2, x1:22, z0:-8, z1:21, celda:1.0 };
+const META   = { x:15.5, z:16.5 };
+
+/* obstáculos: cajas con franjas de peligro. El hueco de salida frente a la
+   bahía se deja libre a propósito, para que el carro pueda salir recto.       */
+const OBST = [
+  { x: 5.0,  z: 7.6, w:2.2, d:6.4, h:1.35, tipo:"caja"   },
+  { x: 10.4, z:10.4, w:6.0, d:2.2, h:1.35, tipo:"caja"   },
+  { x: 9.0,  z: 3.4, w:2.0, d:2.0, h:1.9,  tipo:"bidon"  },
+  { x: 14.6, z: 6.4, w:2.0, d:2.0, h:1.9,  tipo:"bidon"  },
+  { x: 6.6,  z:14.6, w:2.6, d:5.2, h:1.05, tipo:"valla"  },
+  { x:19.6,  z:11.4, w:2.6, d:2.6, h:1.05, tipo:"valla"  },
+];
+
+/* rejilla de ocupación para el planificador */
+const NX = Math.round((ARENA.x1-ARENA.x0)/ARENA.celda);
+const NZ = Math.round((ARENA.z1-ARENA.z0)/ARENA.celda);
+const REJ = new Uint8Array(NX*NZ);
+const MARGEN_CARRO = 1.15;                    // radio de giro del carro
+OBST.forEach(o=>{
+  const x0=Math.floor((o.x-o.w/2-MARGEN_CARRO-ARENA.x0)/ARENA.celda);
+  const x1=Math.ceil ((o.x+o.w/2+MARGEN_CARRO-ARENA.x0)/ARENA.celda);
+  const z0=Math.floor((o.z-o.d/2-MARGEN_CARRO-ARENA.z0)/ARENA.celda);
+  const z1=Math.ceil ((o.z+o.d/2+MARGEN_CARRO-ARENA.z0)/ARENA.celda);
+  for(let i=Math.max(0,x0); i<=Math.min(NX-1,x1); i++)
+    for(let j=Math.max(0,z0); j<=Math.min(NZ-1,z1); j++)
+      REJ[j*NX+i]=1;
+});
+const libre=(i,j)=> i>=0 && j>=0 && i<NX && j<NZ && !REJ[j*NX+i];
+const celda2punto=(i,j)=> new THREE.Vector3(ARENA.x0+(i+0.5)*ARENA.celda, 0,
+                                            ARENA.z0+(j+0.5)*ARENA.celda);
+const punto2celda=(x,z)=>[ Math.floor((x-ARENA.x0)/ARENA.celda),
+                           Math.floor((z-ARENA.z0)/ARENA.celda) ];
+
+/* --- construcción de la arena --- */
+(function construyeArena(){
+  const arena = new THREE.Group(); arena.name = "arena"; scene.add(arena);
+  var grupo = arena;
+
+  /* franjas de peligro para los obstáculos */
+  const texPeligro = texDeCanvas(128,128,(g,w,h)=>{
+    g.fillStyle="#f5a524"; g.fillRect(0,0,w,h);
+    g.fillStyle="#1a1d22";
+    for(let i=-2;i<6;i++){ g.beginPath();
+      g.moveTo(i*32, 0); g.lineTo(i*32+16, 0); g.lineTo(i*32+16+64, h); g.lineTo(i*32+64, h);
+      g.closePath(); g.fill(); }
+  });
+  texPeligro.wrapS = texPeligro.wrapT = THREE.RepeatWrapping;
+  const matPeligro = new THREE.MeshStandardMaterial({ map:texPeligro,
+    metalness:.35, roughness:.62 });
+
+  OBST.forEach(o=>{
+    if(o.tipo === "bidon"){
+      /* bidón: cilindro metálico con aros */
+      const g = new THREE.Group(); g.position.set(o.x, 0, o.z); grupo.add(g);
+      cilindro(o.w/2, o.w/2, o.h, 20, MAT.acero, 0, o.h/2, 0, g);
+      [0.18,0.82].forEach(f=> cilindro(o.w/2*1.06, o.w/2*1.06, 0.10, 20,
+                                        MAT.oscuro, 0, o.h*f, 0, g));
+      cilindro(o.w/2*0.99, o.w/2*0.99, 0.06, 20, matPeligro, 0, o.h*0.60, 0, g);
+      const tapa = cilindro(o.w*0.22, o.w*0.22, 0.09, 12, MAT.oscuro, o.w*0.2, o.h+0.04, 0, g);
+    } else {
+      const g = new THREE.Group(); g.position.set(o.x, 0, o.z); grupo.add(g);
+      const cuerpo = caja(o.w, o.h, o.d, MAT.marco, 0, o.h/2, 0, g);
+      /* franjas en las cuatro caras */
+      const banda = (hy,hd,x,y,z,ry)=>{
+        const t = texPeligro.clone(); t.needsUpdate = true;
+        t.repeat.set(Math.max(1,Math.round((ry?hd:hy)/0.7)), 1);
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(ry?hd:hy, 0.34),
+          new THREE.MeshStandardMaterial({ map:t, metalness:.3, roughness:.6 }));
+        m.position.set(x,y,z); m.rotation.y = ry; g.add(m);
+      };
+      banda(o.w, o.d, 0,            o.h*0.72,  o.d/2+0.011, 0);
+      banda(o.w, o.d, 0,            o.h*0.72, -o.d/2-0.011, Math.PI);
+      banda(o.d, o.w,  o.w/2+0.011, o.h*0.72, 0, Math.PI/2);
+      banda(o.d, o.w, -o.w/2-0.011, o.h*0.72, 0,-Math.PI/2);
+      if(o.tipo === "valla"){                       /* valla: postes arriba */
+        for(let s=-1;s<=1;s+=2)
+          cilindro(0.07,0.07,o.h*0.85,10,MAT.acero, s*(o.w/2-0.15), o.h+o.h*0.42, 0, g);
+        caja(o.w*0.96,0.10,0.10,MAT.acero, 0, o.h+o.h*0.80, 0, g);
+      } else {                                      /* caja: tapa y flejes */
+        caja(o.w*1.02,0.09,o.d*1.02, MAT.oscuro, 0, o.h+0.04, 0, g);
+        [-1,1].forEach(s=> caja(0.10, o.h+0.06, o.d*1.03, MAT.acero, s*o.w*0.32, o.h/2, 0, g));
+      }
+    }
+  });
+
+  /* --- la meta (diana de entrega) --- */
+  const g = new THREE.Group(); g.position.set(META.x, 0, META.z); grupo.add(g);
+  const rExt = 2.35, rInt = 1.05;
+  /* peana circular, en dos escalones */
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(rExt, rExt+0.16, 0.26, 40),
+    new THREE.MeshStandardMaterial({ color:0x33404a, metalness:.75, roughness:.45 }));
+  base.position.y = 0.13; base.receiveShadow = true; base.castShadow = true; g.add(base);
+  const piso = new THREE.Mesh(new THREE.CylinderGeometry(rInt+0.10, rInt+0.10, 0.12, 36),
+    new THREE.MeshStandardMaterial({ color:0x1b2129, metalness:.6, roughness:.55 }));
+  piso.position.y = 0.31; piso.receiveShadow = true; g.add(piso);
+  /* anillo emisivo: late despacio */
+  const matAnillo = new THREE.MeshStandardMaterial({ color:0x0d3b34, metalness:.5,
+    roughness:.3, emissive:0x34d399, emissiveIntensity:1.6 });
+  const anillo = new THREE.Mesh(new THREE.TorusGeometry(rInt+0.02, 0.075, 12, 60), matAnillo);
+  anillo.rotation.x = Math.PI/2; anillo.position.y = 0.40; g.add(anillo);
+  const matAnillo2 = new THREE.MeshStandardMaterial({ color:0x3a2a06, metalness:.5,
+    roughness:.3, emissive:0xfbbf24, emissiveIntensity:0.7 });
+  const anillo2 = new THREE.Mesh(new THREE.TorusGeometry(rExt-0.18, 0.05, 10, 64), matAnillo2);
+  anillo2.rotation.x = Math.PI/2; anillo2.position.y = 0.30; g.add(anillo2);
+  /* marcas de la diana */
+  [0,1,2,3].forEach(k=>{
+    const s = (k%2? 1 : -1);
+    const m = caja(0.16, 0.04, rExt-rInt-0.35,
+      new THREE.MeshStandardMaterial({ color:0xe2e8f0, metalness:.2, roughness:.6 }),
+      0, 0.27, s*(rInt+rExt)/2, g);
+    m.rotation.y = (k<2? Math.PI/2 : 0);
+    m.position.set(k<2 ? s*(rInt+rExt)/2 : 0, 0.27, k<2 ? 0 : s*(rInt+rExt)/2);
+  });
+  /* cuatro pilones con baliza fija (estáticas, no giran) */
+  const pilones=[];
+  for(let k=0;k<4;k++){
+    const a = Math.PI/4 + k*Math.PI/2;
+    const px = Math.cos(a)*rExt, pz = Math.sin(a)*rExt;
+    const p = new THREE.Group(); p.position.set(px, 0, pz); g.add(p);
+    cilindro(0.10, 0.13, 1.5, 12, MAT.acero, 0, 0.75, 0, p);
+    const col = new THREE.MeshStandardMaterial({ color:0x11151b, metalness:.3, roughness:.35,
+      emissive:0x34d399, emissiveIntensity:2.4 });
+    const luz = new THREE.Mesh(new THREE.SphereGeometry(0.115,14,10), col);
+    luz.position.y = 1.58; p.add(luz);
+    cylindeAlias(p, col);
+    pilones.push(col);
+  }
+  /* cartel "META" */
+  const cartel = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 0.85),
+    new THREE.MeshBasicMaterial({ map: cartelMeta(), transparent:true,
+      blending:THREE.AdditiveBlending, depthWrite:false }));
+  cartel.position.set(0, 3.15, 0); g.add(cartel);
+  const hMastil = cilindro(0.05,0.05,3.0,10,MAT.acero, 0, 1.5, 0, g);
+  const haloMeta = halo(0x34d399, 3.4, 0, 0.5, 0, .40, g);
+  window.__meta = { anillo:matAnillo, anillo2:matAnillo2, pilones, halo:haloMeta, cartel,
+                    base, rInt, rExt };
+
+  function cylindeAlias(p, col){          // aro del pilón
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.030, 8, 20),
+      new THREE.MeshStandardMaterial({ color:0x1d3a34, metalness:.6, roughness:.35,
+        emissive:0x34d399, emissiveIntensity:.5 }));
+    aro.position.y = 1.58; aro.rotation.x = Math.PI/2; p.add(aro);
+  }
+  function cartelMeta(){
+    return texDeCanvas(512,176,(g,w,h)=>{
+      g.clearRect(0,0,w,h);
+      g.strokeStyle="rgba(52,211,153,.85)"; g.lineWidth=5;
+      g.strokeRect(6,6,w-12,h-12);
+      g.fillStyle="#34d399"; g.font="700 74px Segoe UI,sans-serif";
+      g.textAlign="center"; g.textBaseline="middle";
+      g.fillText("META", w/2, h/2-16);
+      g.fillStyle="#6ee7b7"; g.font="600 26px Segoe UI,sans-serif";
+      g.fillText("DIANA DE ENTREGA", w/2, h/2+40);
+    });
+  }
+})();
+
+/* --- cinta de ruta pintada en el suelo (se dibuja tras planificar) --- */
+const RUTA = { malla:null, tex:null, puntos:[], largo:0 };
+(function creaCintaRuta(){
+  const tex = texDeCanvas(256,64,(g,w,h)=>{
+    g.clearRect(0,0,w,h);
+    g.fillStyle="rgba(52,211,153,.85)";
+    for(let i=0;i<4;i++){ const x=i*64; g.beginPath();
+      g.moveTo(x, 8); g.lineTo(x+34, h/2); g.lineTo(x, h-8);
+      g.lineTo(x+16, h-8); g.lineTo(x+50, h/2); g.lineTo(x+16, 8);
+      g.closePath(); g.fill(); }
+  });
+  tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
+  RUTA.tex = tex;
+  const malla = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.62),
+    new THREE.MeshBasicMaterial({ map:tex, transparent:true, opacity:.55,
+      blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }));
+  malla.rotation.x = -Math.PI/2; malla.position.y = 0.02;
+  malla.visible = false; scene.add(malla); RUTA.malla = malla;
+})();
+
+/* marca de la bahía de carga, en el suelo */
+(function marcaBahia(){
+  const tex = texDeCanvas(512,512,(g,w,h)=>{
+    g.clearRect(0,0,w,h);
+    g.strokeStyle="rgba(245,158,11,.55)"; g.lineWidth=14;
+    g.setLineDash([46,30]); g.strokeRect(26,26,w-52,h-52);
+    g.setLineDash([]); g.strokeStyle="rgba(245,158,11,.30)"; g.lineWidth=8;
+    g.strokeRect(58,58,w-116,h-116);
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 5.4),
+    new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthWrite:false }));
+  m.rotation.x = -Math.PI/2; m.position.set(X_CARRO, 0.015, 0); scene.add(m);
+})();
+
+/* ------------------------------------------------- 12. PARTÍCULAS DE POLVO */
+const polvo = (function(){
+  const N = 520, pos = new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    pos[i*3]   = -13 + Math.random()*36;
+    pos[i*3+1] =  0.3 + Math.random()*8.0;
+    pos[i*3+2] =  -6.0 + Math.random()*27;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const p = new THREE.Points(g, new THREE.PointsMaterial({ size:.075, map:texHalo,
+    color:0x9fc4e8, transparent:true, opacity:.45, depthWrite:false,
+    blending:THREE.AdditiveBlending, sizeAttenuation:true }));
+  scene.add(p); return p;
+})();
+
+/* ================================================================= 13. ESTADO */
+const estado = {
+  monedas:[], enCarro:[],
+  contador:{50:0,100:0,200:0,500:0,1000:0},
+  total:0, valor:0, viajes:1,
+  mensaje:"espera", fase:-1,
+  proximaMoneda:0.8,
+  servoFase:"reposo", servoT:0, pala:0,
+  compuertaAbierta:false, compuertaT:0,
+  barrido:0, escaneoObj:null, lectura:null, lecturaT:0,
+  /* minitanque */
+  carroEstado:"cargando", ruta:null, rutaIdx:0, rutaT:0, rutaLargo:0,
+  viajeValor:0, entregado:0, viajesEntregados:0,
+};
+
+const faseEl = [...document.querySelectorAll('.fase')];
+function marcarFase(i){
+  if(estado.fase === i) return;
+  faseEl.forEach((e,k)=>{ e.classList.toggle('on', k===i); e.classList.toggle('hecha', k<i); });
+  estado.fase = i;
+}
+
+const H = { den:$('#tDen'), dia:$('#tDia'), gru:$('#tGru'), tono:$('#tTono'),
+            mar:$('#tMar'), servo:$('#tServo'), conf:$('#confFill'),
+            est:$('#tEst'), punto:$('#punto'), n:$('#nCarro'), v:$('#vCarro'),
+            viajes:$('#tViajes'), entregado:$('#tEntregado') };
+const TEXTOS = {
+  espera:"En espera, cargando en la bahía…", alimentando:"Soltando moneda en la tolva…",
+  escaneando:"Midiendo rasgos de la moneda…", clasificado:"Clasificado. Enviando a la banda.",
+  banda:"Transporte por banda…", empujando:"Servo empujando hacia el carro…",
+  cargando:"Moneda depositada en el carro…",
+  ruta:"Ruta planificada. El carro va a la meta…",
+  descargando:"Descargando en la diana de entrega…",
+  vuelta:"De vuelta a la bahía de carga…",
+  sinRuta:"Sin ruta libre hasta la meta: el carro espera",
+};
+function hud(){
+  const l = estado.lectura;
+  H.den.textContent = l ? "$"+l.r.d.v.toLocaleString("es-CO") : "—";
+  H.den.style.color = l ? "#34d399" : "#7d8ea3";
+  H.dia.textContent = l ? l.m.dia.toFixed(2)+" mm" : "—";
+  H.gru.textContent = l ? l.m.gr.toFixed(2)+" mm" : "—";
+  H.tono.textContent = l ? (l.m.oro ? "ORO "+Math.round(l.m.nucleo*100)+"%"
+                                    : "PLATA "+Math.round(l.m.nucleo*100)+"%") : "—";
+  H.mar.textContent = l ? l.r.margenMM.toFixed(1)+" (0.1 mm)" : "—";
+  H.servo.textContent = (estado.pala*24).toFixed(1)+"°";
+  H.conf.style.width = l ? (l.r.conf*100).toFixed(0)+"%" : "0%";
+  H.est.textContent = TEXTOS[estado.mensaje] || "";
+  const col = estado.mensaje==="clasificado" ? "#34d399"
+            : (estado.mensaje==="ruta" || estado.mensaje==="descargando"
+               || estado.mensaje==="vuelta" || estado.mensaje==="sinRuta") ? "#f59e0b"
+            : estado.mensaje==="escaneando" ? "#22d3ee" : "#94a3b8";
+  H.est.style.color = col; H.punto.style.background = col;
+  H.punto.style.boxShadow = "0 0 10px "+col;
+  H.n.textContent = estado.total;
+  H.v.textContent = "$"+estado.valor.toLocaleString("es-CO");
+  H.viajes.textContent = estado.viajesEntregados;
+  H.entregado.textContent = "$"+estado.entregado.toLocaleString("es-CO");
+  DEN.forEach(d=>{ $("#c"+d.v).textContent = estado.contador[d.v]; });
+}
+
+/* ---------------------------------------------------- 14. PLANIFICADOR A* */
+/* Rejilla de 8 vecinos con coste euclídeo. Se prohíben los cortes de esquina:
+   cortar por la diagonal entre dos celdas libres arrastraría al carro por la
+   esquina del obstáculo, que es justo el fallo que hace atascar a un vehículo
+   con orugas. Mismo criterio que en core/planificador.py.                       */
+const VECINOS = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],
+                 [1,1,1.4142],[1,-1,1.4142],[-1,1,1.4142],[-1,-1,1.4142]];
+function aStar(desde, hasta){
+  const ini = punto2celda(desde.x, desde.z);
+  /* La meta pedida puede caer dentro de un obstáculo (por ejemplo, si alguien
+     la mueve). En vez de rendirse, se busca la celda libre más cercana: es lo
+     que hace un planificador de verdad y evita el "no hay ruta" por un detalle
+     geométrico. */
+  let fin = punto2celda(hasta.x, hasta.z);
+  if(!libre(fin[0], fin[1])){
+    let mejor=null, mejorD=Infinity;
+    for(let j=0;j<NZ;j++) for(let i=0;i<NX;i++){
+      if(!libre(i,j)) continue;
+      const d=(i-fin[0])*(i-fin[0]) + (j-fin[1])*(j-fin[1]);
+      if(d<mejorD){ mejorD=d; mejor=[i,j]; }
+    }
+    if(!mejor) return null;
+    fin = mejor;
+  }
+  const n = NX*NZ;
+  const g = new Float32Array(n).fill(Infinity);
+  const f = new Float32Array(n).fill(Infinity);
+  const came = new Int32Array(n).fill(-1);
+  const cerrado = new Uint8Array(n);
+  const heur = (i,j)=>{
+    const dx=Math.abs(i-fin[0]), dz=Math.abs(j-fin[1]);
+    return (dx+dz) + (1.4142-2)*Math.min(dx,dz);
+  };
+  const idx = (i,j)=> j*NX+i;
+  const s = idx(ini[0],ini[1]);
+  g[s]=0; f[s]=heur(ini[0],ini[1]);
+  const cola = [s];
+  const enCola = new Uint8Array(n); enCola[s]=1;
+  let guard=0;
+  while(cola.length && guard++ < 60000){
+    /* cola lineal: la rejilla es pequeña (24x27) y sale más rápido que un heap */
+    let bi=0; for(let k=1;k<cola.length;k++) if(f[cola[k]]<f[cola[bi]]) bi=k;
+    const actual = cola.splice(bi,1)[0];
+    enCola[actual]=0;
+    if(actual === idx(fin[0],fin[1])){
+      const ruta=[]; let c=actual;
+      while(c!==-1){ ruta.push(c); c=came[c]; }
+      ruta.reverse();
+      return ruta.map(k=>celda2punto(k%NX, Math.floor(k/NX)));
+    }
+    cerrado[actual]=1;
+    const i = actual%NX, j = Math.floor(actual/NX);
+    for(const [dx,dz,coste] of VECINOS){
+      const ni=i+dx, nj=j+dz;
+      if(!libre(ni,nj)) continue;
+      if(dx&&dz && (!libre(i+dx,j) || !libre(i,j+dz))) continue;   // sin cortar esquinas
+      const k = idx(ni,nj);
+      if(cerrado[k]) continue;
+      const tent = g[actual] + coste;
+      if(tent < g[k]){
+        came[k]=actual; g[k]=tent; f[k]=tent + heur(ni,nj);
+        if(!enCola[k]){ cola.push(k); enCola[k]=1; }
+      }
+    }
+  }
+  return null;
+}
+/* Suavizado por línea de visión: quita los puntos intermedios cuando puede ir
+   recto. Sin esto la ruta sale escalonada y el carro va dando tirones.        */
+function suavizar(puntos, desde, hasta){
+  if(!puntos || !puntos.length) return null;
+  const librePunto=(x,z)=>{
+    const [i,j] = punto2celda(x,z);
+    return libre(i,j) && libre(i+1,j) && libre(i,j+1) && libre(i+1,j+1);
+  };
+  const out=[], cola=[new THREE.Vector3(desde.x,0,desde.z)].concat(puntos)
+                        .concat([new THREE.Vector3(hasta.x,0,hasta.z)]);
+  let i=0;
+  while(i < cola.length-1){
+    let j=cola.length-1;
+    for(; j>i+1; j--){
+      const a=cola[i], b=cola[j];
+      const pasos=Math.ceil(a.distanceTo(b)/0.35);
+      let ok=true;
+      for(let s=1;s<pasos;s++){
+        const u=s/pasos;
+        if(!librePunto(a.x+(b.x-a.x)*u, a.z+(b.z-a.z)*u)){ ok=false; break; }
+      }
+      if(ok) break;
+    }
+    out.push(cola[j].clone()); i=j;
+  }
+  return out;
+}
+function planificarRuta(hasta){
+  const desde = carro.position;
+  const cruda = aStar(desde, hasta);
+  if(!cruda) return null;
+  return suavizar(cruda, desde, hasta);
+}
+/* pinta la cinta de ruta sobre el suelo */
+function pintarRuta(puntos){
+  if(!puntos || puntos.length<2){ if(RUTA.malla) RUTA.malla.visible=false; return 0; }
+  const pos=[], uv=[], idxs=[];
+  let largo=0;
+  for(let i=0;i<puntos.length-1;i++){
+    const a=puntos[i], b=puntos[i+1];
+    const dx=b.x-a.x, dz=b.z-a.z, L=Math.hypot(dx,dz);
+    if(L<1e-4) continue;
+    const nx=-dz/L*0.31, nz=dx/L*0.31;
+    pos.push(a.x+nx,0.02,a.z+nz,  a.x-nx,0.02,a.z-nz,
+             b.x+nx,0.02,b.z+nz,  b.x-nx,0.02,b.z-nz);
+    const u0=largo/1.15, u1=(largo+L)/1.15;
+    uv.push(u0,1, u0,0, u1,1, u1,0);
+    idxs.push((idxs.length/2|0)*4, (idxs.length/2|0)*4+1, (idxs.length/2|0)*4+2,
+              (idxs.length/2|0)*4+1, (idxs.length/2|0)*4+3, (idxs.length/2|0)*4+2);
+    largo += L;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idxs);
+  RUTA.malla.geometry.dispose();
+  RUTA.malla.geometry = g;
+  RUTA.malla.visible = true;
+  RUTA.puntos = puntos; RUTA.largo = largo;
+  return largo;
+}
+function sortear(){
+  let r = Math.random(), a = 0;
+  for(const d of DEN){ a += d.prob; if(r <= a) return d; }
+  return DEN[0];
+}
+function nuevaMoneda(){
+  const d = sortear(), g = meshMoneda(d);
+  g.position.set(X_TOLVA+(Math.random()-.5)*0.12, 4.25, (Math.random()-.5)*0.12);
+  g.rotation.set((Math.random()-.5)*0.3, Math.random()*6.28, (Math.random()-.5)*0.3);
+  scene.add(g);
+  estado.monedas.push({ g, d, x:g.position.x, y:g.position.y, z:g.position.z,
+    vx:(Math.random()-.5)*0.2, vy:0, vz:(Math.random()-.5)*0.2,
+    fase:"caer", w:(Math.random()-.5)*2, esc:false });
+  estado.mensaje = "alimentando"; marcarFase(0);
+  estado.compuertaAbierta = true; estado.compuertaT = 0;
+}
+
+/* --------------------------------------------------------- 15. ACTUALIZACIÓN */
+const M_MONEDA = new THREE.Matrix4(), Q_MONEDA = new THREE.Quaternion(),
+      V_MONEDA = new THREE.Vector3(), V_UNO = new THREE.Vector3(1,1,1),
+      EJE_Z = new THREE.Vector3(0,0,1);
+
+function actualizar(dt, t){
+  /* --- banda --- */
+  texBanda.offset.x -= (V_BANDA*dt)/0.9;
+  texRet.offset.x   += (V_BANDA*dt)/0.9;
+  rodillos[0].rotation.y -= (V_BANDA*dt)/0.17;
+  rodillos[1].rotation.y -= (V_BANDA*dt)/0.17;
+
+  /* --- compuerta de la cámara --- */
+  if(estado.compuertaAbierta){
+    estado.compuertaT += dt;
+    compuerta.rotation.y = -0.95*Math.min(1, estado.compuertaT*6);
+    if(estado.compuertaT > 0.72){ estado.compuertaAbierta = false; estado.compuertaT = 0; }
+  }else{
+    compuerta.rotation.y += (0 - compuerta.rotation.y)*Math.min(1, dt*7);
+  }
+
+  /* --- barrido del haz --- */
+  if(estado.barrido > 0){
+    estado.barrido -= dt;
+    const f = 1 - estado.barrido/1.05;
+    haz.position.y = 0.42 - 0.44*Math.abs(Math.sin(f*Math.PI));
+    hazMat.opacity  = 0.16 + 0.30*Math.abs(Math.cos(f*Math.PI*3));
+    if(estado.barrido <= 0){ haz.position.y = 0.30; hazMat.opacity = 0.30; }
+  }
+
+  /* --- servo empujador --- */
+  const ext = estado.servoFase === "empuja" ? EXTENSION : 0;
+  const vel = estado.servoFase === "empuja" ? 6.4 : 5.0;
+  const d  = ext - estado.pala;
+  estado.pala += Math.sign(d)*Math.min(Math.abs(d), vel*dt);
+  brazo.position.x = -RECOGIDA + estado.pala;
+  biela.position.x = -RECOGIDA - estado.pala*0.30;
+  biela.scale.z = 1 + estado.pala*0.55;
+  bocina.rotation.y = -estado.pala*1.5;
+  ledServo.material.emissiveIntensity = estado.servoFase==="empuja" ? 3.4 : 1.2;
+
+  /* --- la lectura se apaga sola --- */
+  if(estado.lectura && (estado.lecturaT -= dt) <= 0){
+    estado.lectura = null; pintarHolo(null,null);
+  }
+
+  actualizarCarro(dt);
+
+  /* --- cola de la banda: cada moneda guarda distancia con la de delante --- */
+  const cola = estado.monedas.filter(m=>m.fase==="banda" || m.fase==="espera");
+  cola.sort((a,b)=> b.x - a.x);                       // la de delante primero
+  let limite = X_SERVO;
+  for(let i=0;i<cola.length;i++){
+    const m = cola[i];
+    if(i > 0) limite = Math.min(limite, cola[i-1].x - HUECO_MONEDA);
+    if(m.fase === "banda"){
+      if(m.x < limite)      m.x = Math.min(limite, m.x + V_BANDA*dt);
+      else if(m.x > limite) m.x = Math.max(limite, m.x - 2.5*dt);
+      m.g.rotation.y += m.w*0.5*dt; m.w *= Math.pow(0.35, dt);
+      if(m.x >= X_SERVO - 0.005){
+        m.x = X_SERVO; m.fase = "espera";
+        estado.mensaje = "banda"; marcarFase(2);
+      }
+    }
+  }
+  /* el servo sólo atiende a una moneda cada vez */
+  const enEspera = estado.monedas.find(m=>m.fase === "espera");
+  if(enEspera && estado.servoFase === "reposo"){
+    estado.servoFase = "empuja"; estado.servoT = 0;
+    enEspera.fase = "empujada";
+    estado.mensaje = "empujando"; marcarFase(3);
+  }
+
+  /* --- cada moneda de la línea --- */
+  for(let i=estado.monedas.length-1; i>=0; i--){
+    const m = estado.monedas[i];
+    const alto = m.g.userData.alto;
+
+    if(m.fase === "caer"){
+      m.vy -= 15*dt; m.y += m.vy*dt; m.x += m.vx*dt; m.z += m.vz*dt;
+      m.g.rotation.x += m.w*dt; m.g.rotation.z += m.w*0.6*dt;
+      if(m.y <= Y_BANDA + alto/2){
+        m.y = Y_BANDA + alto/2; m.vy = 0; m.fase = "banda"; m.w *= 0.2;
+        m.x = X_TOLVA; m.z *= 0.2;
+        if(!m.esc){                       /* al entrar en la cámara se mide */
+          m.esc = true; estado.barrido = 1.05; estado.escaneoObj = m;
+          estado.mensaje = "escaneando"; marcarFase(1);
+        }
+      }
+    }
+    else if(m.fase === "banda"){
+      m.g.rotation.y += m.w*0.5*dt;
+    }
+    else if(m.fase === "espera"){
+      m.g.rotation.y += m.w*0.12*dt;
+    }
+    else if(m.fase === "empujada"){
+      m.x += 5.6*dt; m.g.rotation.z += 0.9*dt;
+      if(m.x >= X_SALIDA){
+        m.fase = "volar"; m.vx = V_SALIDA; m.vy = 0.9; m.vz = (Math.random()-.5)*0.5;
+        estado.servoFase = "reposo"; estado.servoT = 0;
+      }
+    }
+    else if(m.fase === "volar"){
+      m.vy -= 9.0*dt;
+      m.x += m.vx*dt; m.y += m.vy*dt; m.z += m.vz*dt;
+      m.g.rotation.x += 7.5*dt; m.g.rotation.y += 2.0*dt;
+      const suelo = PISO_CAJA + alto/2;
+      if(m.y <= suelo && estado.carroEstado === "cargando"
+         && Math.abs(m.x - carro.position.x) < CAJA.w/2 + 0.35
+         && Math.abs(m.z - carro.position.z) < CAJA.l/2 + 0.35){
+        /* se apilan un poco, no todas en el mismo punto */
+        const n = estado.enCarro.length;
+        m.g.position.set((Math.random()-.5)*(CAJA.w-0.55), suelo + Math.floor(n/4)*0.10,
+                         (Math.random()-.5)*(CAJA.l-0.55));
+        m.g.rotation.set((Math.random()-.5)*0.2, Math.random()*6.28, (Math.random()-.5)*0.2);
+        lineaCarga.add(m.g);
+        m.fase = "caja";
+        estado.contador[m.d.v]++; estado.total++;
+        estado.valor += m.d.v; estado.viajeValor += m.d.v;
+        pilotos.forEach((p,k)=>{
+          p.emissiveIntensity = (DEN[k].v === m.d.v) ? 2.8
+                              : (p.emissiveIntensity > 0 ? 1.0 : 0);
+        });
+        estado.mensaje = "cargando"; marcarFase(4);
+        estado.monedas.splice(i,1); estado.enCarro.push(m); hud();
+      }
+      else if(m.y < 0.35){               // se perdió: a retirarla
+        scene.remove(m.g); estado.monedas.splice(i,1);
+      }
+    }
+    /* la posición lógica es la verdad: el mesh la sigue cada paso */
+    if(m.fase !== "caja") m.g.position.set(m.x, m.y, m.z);
+  }
+
+  /* --- medición --- */
+  if(estado.escaneoObj && estado.escaneoObj.fase === "banda"){
+    const c = estado.escaneoObj;
+    const med = sensorear(c.d), res = clasificar(med);
+    estado.lectura = { m:med, r:res }; estado.lecturaT = 6.5;
+    estado.escaneoObj = null; estado.mensaje = "clasificado";
+    pintarHolo(med, res); hud();
+  }
+
+  /* --- alimentación: hasta 3 monedas encoladas en la banda, y no se alimenta
+         si el carro ya está lleno (eso dispara la salida a la meta) --- */
+  if(estado.carroEstado === "cargando" && estado.total < CAPACIDAD){
+    estado.proximaMoneda -= dt;
+    if(estado.proximaMoneda <= 0 && estado.monedas.length < 3){
+      nuevaMoneda(); estado.proximaMoneda = 1.15;
+    }
+  }
+
+  /* --- la meta late despacio y avisa cuando hay carga por entregar --- */
+  const M = window.__meta;
+  if(M){
+    const listo = (estado.carroEstado === "ruta" || estado.carroEstado === "descargando");
+    M.anillo.emissiveIntensity = listo ? 2.4 + Math.sin(t*5)*1.4
+                                       : 1.2 + Math.sin(t*1.6)*0.5;
+    M.anillo2.emissiveIntensity = listo ? 1.8 : 0.6;
+    M.pilones.forEach(p=> p.emissiveIntensity = listo ? 2.6 + Math.sin(t*5)*1.2 : 1.6);
+    M.halo.material.opacity = listo ? 0.62 : 0.34;
+  }
+  /* la cinta de ruta se desplaza, como si la pintaran por adelantado */
+  if(RUTA.malla.visible) RUTA.tex.offset.x -= dt*0.16;
+
+  /* --- polvo --- */
+  const pos = polvo.geometry.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    let y = pos.getY(i) - dt*0.10; if(y < 0.2) y = 7.8;
+    pos.setY(i, y);
+  }
+  pos.needsUpdate = true;
+}
+
+/* ============================================ 15b. CONDUCCIÓN DEL MINITANQUE */
+/* Un vehículo con orugas no puedeuir hacia un lado: o avanza, o gira sobre su
+   propio eje. Por eso el seguimiento no interpola la posición, sino que en cada
+   paso apunta al waypoint y decide entre pivotar o avanzar. Las dos orugas
+   entonces sí van a distinta velocidad, que es justo lo que hace un tanque.   */
+const CONDUCCION = { v:0, w:0 };
+
+function actualizarCarro(dt){
+  const e = estado, c = carro;
+  let ordenIzq = 0, ordenDer = 0;
+
+  if(e.carroEstado === "cargando"){
+    if(e.total >= CAPACIDAD){
+      /* cargado: planifica y arranca */
+      const ruta = planificarRuta(new THREE.Vector3(META.x, 0, META.z));
+      if(!ruta){                       /* sin ruta: no se arranca (y se avisa) */
+        e.mensaje = "sinRuta"; return;
+      }
+      e.ruta = ruta; e.rutaIdx = 0; e.rutaLargo = pintarRuta(ruta);
+      e.carroEstado = "ruta"; e.mensaje = "ruta"; marcarFase(4);
+    }
+  }
+  else if(e.carroEstado === "ruta"){
+    const r = seguirRuta(e, dt);
+    ordenIzq = r.izq; ordenDer = r.der;
+    if(r.llegado){
+      e.carroEstado = "descargando"; e.rutaT = 0; e.mensaje = "descargando";
+    }
+  }
+  else if(e.carroEstado === "descargando"){
+    e.rutaT += dt;
+    /* las monedas se vierten en la diana: bajan al fondo del cuenco */
+    if(e.rutaT < 2.4 && e.enCarro.length){
+      const quiza = Math.min(e.enCarro.length, Math.ceil(dt*22));
+      for(let k=0;k<quiza;k++){
+        const m = e.enCarro.pop();
+        if(!m) break;
+        m.g.position.y -= dt*(2.2 + Math.random()*1.6);
+        m.g.rotation.x += dt*3.0;
+        if(m.g.position.y < 0.30){ lineaCarga.remove(m.g); }
+      }
+    }
+    if(e.rutaT > 4.2 && e.enCarro.length === 0){
+      e.entregado += e.viajeValor; e.viajesEntregados++;
+      e.total = 0; e.valor = 0; e.viajeValor = 0;
+      DEN.forEach(d=> e.contador[d.v] = 0);
+      pilotos.forEach(p=> p.emissiveIntensity = 0);
+      /* ahora la vuelta: de la meta a la bahía */
+      const ruta = planificarRuta(new THREE.Vector3(X_CARRO, 0, 0));
+      e.ruta = ruta; e.rutaIdx = 0;
+      e.rutaLargo = ruta ? pintarRuta(ruta) : 0;
+      e.carroEstado = "vuelta"; e.mensaje = "vuelta";
+      if(!ruta){ e.mensaje="sinRuta"; }
+      hud();
+    }
+  }
+  else if(e.carroEstado === "vuelta"){
+    if(!e.ruta){                        /* sin ruta de vuelta: se queda en la meta */
+      e.mensaje = "sinRuta"; return;
+    }
+    const r = seguirRuta(e, dt);
+    ordenIzq = r.izq; ordenDer = r.der;
+    if(r.llegado){
+      e.carroEstado = "cargando"; e.mensaje = "espera"; marcarFase(0);
+      e.viajes++; e.proximaMoneda = 0.4;
+      e.ruta = null; e.rutaIdx = 0; e.rutaLargo = 0;
+      pintarRuta(null);
+      hud();
+    }
+  }
+
+  /* la base del carro gira con la dirección de marcha */
+  CONDUCCION.v = (ordenIzq + ordenDer)/2;
+  CONDUCCION.w = (ordenDer - ordenIzq)/2;
+
+  /* --- las origas: cada una a su ritmo, que es lo que permite pivotar --- */
+  [ [pistaIzq, ordenIzq], [pistaDer, ordenDer] ].forEach(([P, orden])=>{
+    if(Math.abs(orden) < 0.01) return;
+    P.off -= orden*dt;
+    for(let i=0;i<TR.n;i++){
+      const p = circuito(i*P.paso + P.off, P.S, TR.radio);
+      const out = 0.055;
+      V_MONEDA.set(p.x + Math.sin(p.a)*out, p.y - Math.cos(p.a)*out, 0);
+      Q_MONEDA.setFromAxisAngle(EJE_Z, p.a);
+      M_MONEDA.compose(V_MONEDA, Q_MONEDA, V_UNO);
+      P.im.setMatrixAt(i, M_MONEDA);
+    }
+    P.im.instanceMatrix.needsUpdate = true;
+  });
+  /* las ruedas sólo giran si su oruga Correspondingly se mueve */
+  const giraRuedas = (orden)=> (Math.abs(orden)<0.01 ? 0 : orden/TR.radio*dt);
+  pistaIzq.ruedas.forEach(rr=>{ if(rr.rotation) rr.rotation.y += giraRuedas(ordenIzq); });
+  pistaDer.ruedas.forEach(rr=>{ if(rr.rotation) rr.rotation.y += giraRuedas(ordenDer); });
+}
+
+/* sigue los waypoints; devuelve las órdenes de cada oruga y si llegó */
+function seguirRuta(e, dt){
+  const c = carro, salida = { izq:0, der:0, llegado:false };
+  const RUTA_MIN = 0.75, V_MAX = 3.0, GIRO_MAX = 1.55;
+  if(!e.ruta || e.rutaIdx >= e.ruta.length){ salida.llegado = true; return salida; }
+
+  const wp = e.ruta[e.rutaIdx];
+  const dx = wp.x - c.position.x, dz = wp.z - c.position.z;
+  const dist = Math.hypot(dx, dz);
+  if(dist < RUTA_MIN){
+    e.rutaIdx++;
+    if(e.rutaIdx >= e.ruta.length){ salida.llegado = true; return salida; }
+    return seguirRuta(e, dt);
+  }
+  const rumbo = Math.atan2(dx, dz);            // 0 = +Z
+  let err = rumbo - c.rotation.y;
+  while(err >  Math.PI) err -= Math.PI*2;
+  while(err < -Math.PI) err += Math.PI*2;
+
+  /* descafeita al llegar al waypoint: si ya estamos encima, no hace falta
+     girar; es lo que quita el tembleque al final de cada tramo */
+  const alineado = Math.abs(err) < 0.16;
+  const w = Math.max(-GIRO_MAX, Math.min(GIRO_MAX, err*2.3));
+  c.rotation.y += w*dt;
+
+  /* política: si el error de rumbo es grande, pivotar en el sitio (una oruga
+     quieta, la otra hacia delante); si ya está alineado, avanzar recto */
+  let v = 0;
+  if(Math.abs(err) < 0.85 || alineado){
+    v = Math.min(V_MAX, 0.75 + dist*0.9);
+    if(Math.abs(err) > 0.20) v *= Math.max(0.22, 1 - Math.abs(err)*0.85);
+  }
+  if(alineado) v = Math.min(V_MAX, 0.9 + dist*1.15);
+  /* frenada antes del último waypoint */
+  if(e.rutaIdx === e.ruta.length-1) v = Math.min(v, 1.0 + dist*0.85);
+
+  const medio = v*Math.cos(err)/2, giro = w*1.05;
+  salida.izq = medio + giro;
+  salida.der = medio - giro;
+  /* Kinemática de orugas: el avance sale del promedio de las dos orugas y va
+     en la dirección del rumbo. Si las dos van para el mismo lado, el carro
+     avanza; si van contrarias, pivota sobre su eje. */
+  const vReal = (salida.izq + salida.der)/2;
+  c.position.x += Math.sin(c.rotation.y)*vReal*dt;
+  c.position.z += Math.cos(c.rotation.y)*vReal*dt;
+  return salida;
+}
+
+
+/* ------------------------------------------------------------ 16. CÁMARA */
+const planos = [
+  { p:[-3.0, 8.2, 17.0], l:[-3.2, 2.0, 0],   dur:8.0 },   // general de la línea
+  { p:[-17.6,6.2, 9.4],  l:[X_TOLVA+0.4, 3.9, 0], dur:6.0 }, // estación de visión
+  { p:[  4.2, 3.6, 8.4],  l:[ 0.4, 2.2, 0],  dur:5.5 },   // servo y salida
+  { p:[  7.2, 3.6, 6.6],  l:[X_CARRO, 1.0, 0], dur:6.0 }, // carro y pistas
+  { p:[  2.0, 1.5, 10.5], l:[-2.0, 1.9, 0],  dur:5.0 },   // contrapicado
+  { p:[ 10.0,19.0, 33.0], l:[ 7.0, 0.0, 9.5], dur:9.0 },   // arena y ruta completa
+  { p:[ 22.5, 7.0, 23.5], l:[META.x, 1.2, META.z], dur:7.0 }, // la meta de cerca
+  { sigue:true, dur:9.0, alto:3.4, atras:7.5, lado:3.4 },   // persecución del carro
+];
+let iPlano = 0, tPlano = 0;
+const look = new THREE.Vector3(-3.2,2.0,0);
+const posDeseada = new THREE.Vector3(-3.0,8.2,17.0);
+const lookDeseado = new THREE.Vector3(-3.2,2.0,0);
+let camSeg = 0;                       // rumbo suavizado de la cámara de persecución
+function moverCamara(dt,t){
+  tPlano += dt;
+  if(tPlano > planos[iPlano].dur){ tPlano = 0; iPlano = (iPlano+1) % planos.length; }
+  const s = planos[iPlano];
+
+  if(s.sigue){
+    /* Persecución anclada al carro. El rumbo de la cámara se suaviza aparte del
+       del carro: si se usara el suyo, al pivotar 180 grados la cámara barrería
+       el arco entero y se quedaría atrás, muy lejos. */
+    let d = carro.rotation.y - camSeg;
+    while(d >  Math.PI) d -= Math.PI*2;
+    while(d < -Math.PI) d += Math.PI*2;
+    camSeg += d*(1 - Math.exp(-dt*2.6));
+    const c = carro.position, sn = Math.sin(camSeg), cs = Math.cos(camSeg);
+    posDeseada.set(c.x - sn*s.atras + cs*s.lado, s.alto, c.z - cs*s.atras - sn*s.lado);
+    lookDeseado.set(c.x + sn*2.4, 0.9, c.z + cs*2.4);
+    camera.position.copy(posDeseada);          // ancla: distancia constante
+    look.lerp(lookDeseado, 1 - Math.exp(-dt*4.0));
+    camera.lookAt(look);
+    return;
+  }
+  const dx = Math.sin(t*0.15)*0.85, dz = Math.cos(t*0.11)*0.55;
+  posDeseada.set(s.p[0] + dz, s.p[1] + Math.sin(t*0.13)*0.35, s.p[2] + dx);
+  lookDeseado.set(s.l[0], s.l[1] + Math.sin(t*0.19)*0.10, s.l[2] + dz*0.35);
+  camera.position.lerp(posDeseada, 1 - Math.exp(-dt*1.05));
+  look.lerp(lookDeseado, 1 - Math.exp(-dt*1.5));
+  camera.lookAt(look);
+}
+
+/* ---------------------------------------------------------- 17. BUCLE */
+const reloj = new THREE.Clock();
+let tGlobal = 0, hudT = 0, primerFrame = true;
+const cargador = document.getElementById('cargador');
+function quitarCargador(){
+  if(!cargador) return;
+  cargador.style.opacity = 0;
+  setTimeout(()=>{ if(cargador.parentNode) cargador.remove(); }, 650);
+}
+function bucle(){
+  requestAnimationFrame(bucle);
+  const dt = Math.min(0.05, reloj.getDelta());
+  if(!pausado){
+    tGlobal += dt;
+    actualizar(dt, tGlobal);
+    moverCamara(dt, tGlobal);
+    if((hudT -= dt) <= 0){ hud(); hudT = 0.1; }
+  }
+  renderer.render(scene, camera);
+  if(primerFrame){ primerFrame = false; quitarCargador(); }
+}
+/* enganche de depuración: window.maquina.estado / .verPlano(i) / .avanzar(s) */
+let pausado = false;
+window.maquina = { estado, carro, lineaCarga, DEN, scene, camera, planos,
+  OBST, META, ARENA, RUTA, ruta:pintarRuta, meta:window.__meta,
+  verPlano: i => { iPlano = i; tPlano = 0;
+    const s = planos[i];
+    if(s.sigue){
+      camSeg = carro.rotation.y;
+      const c = carro.position, sn = Math.sin(camSeg), cs = Math.cos(camSeg);
+      camera.position.set(c.x - sn*s.atras + cs*s.lado, s.alto, c.z - cs*s.atras - sn*s.lado);
+      look.set(c.x + sn*2.4, 0.9, c.z + cs*2.4);
+    } else {
+      camera.position.set(s.p[0], s.p[1], s.p[2]);
+      look.set(s.l[0], s.l[1], s.l[2]);
+    }
+    camera.lookAt(look); },
+  pausar: b => { pausado = !!b; },
+  /* avanza la simulación un tiempo dado, a paso fijo y sin depender de rAF */
+  avanzar: (seg, paso, conCamara) => {
+    paso = paso || 1/60;
+    const n = Math.max(1, Math.round(seg/paso));
+    for(let i=0;i<n;i++){ tGlobal += paso; actualizar(paso, tGlobal); }
+    if(conCamara !== false) for(let i=0;i<n;i++) moverCamara(paso, tGlobal);
+    hud(); renderer.render(scene, camera); quitarCargador();
+    return { t:+tGlobal.toFixed(2), total:estado.total, msg:estado.mensaje };
+  },
+  ver: () => ({ total:estado.total, valor:estado.valor, msg:estado.mensaje,
+    den:estado.lectura ? estado.lectura.r.d.v : null,
+    conf:estado.lectura ? +estado.lectura.r.conf.toFixed(3) : null,
+    margen:estado.lectura ? +estado.lectura.r.margenMM.toFixed(1) : null,
+    linea:estado.monedas.length, enCaja:estado.enCarro.length,
+    carroEstado:estado.carroEstado,
+    carro:[+carro.position.x.toFixed(2), +carro.position.z.toFixed(2), +carro.rotation.y.toFixed(2)],
+    wp: estado.rutaIdx, rutaLargo:+estado.rutaLargo.toFixed(1),
+    viajes:estado.viajes, entregados:estado.viajesEntregados,
+    entregado:estado.entregado }) };
+
+ajustar(); pintarHolo(null,null); hud(); bucle();
+</script>
+</body>
+</html>

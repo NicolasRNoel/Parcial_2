@@ -1,0 +1,14 @@
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Node / builds (por si alguien lo empaqueta)
+node_modules/
+dist/
+build/
+*.log
