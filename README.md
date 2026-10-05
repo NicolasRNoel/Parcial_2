@@ -66,7 +66,7 @@ Para evitar que los 600 g detengan o deslicen el robot en la rampa, se implement
 
 ---
 
-## 🖥️ Telemetría y Asistente de Voz
+## 🖥️ Asistente de Voz
 
 * **Dashboard en Tiempo Real:** Visualización gráfica de la velocidad de la banda, conteo por denominación de moneda y estatus de navegación del minitanque.
 * **Chatbot NARRADOR de Voz:** Módulo interactivo que describe verbalmente el estado del proceso, la detección de obstáculos y la llegada exitosa a la meta.
@@ -82,3 +82,4 @@ Para evitar que los 600 g detengan o deslicen el robot en la rampa, se implement
 ---
 
 ## 📌 Diagrama de Flujo del Proceso
+file:///D:/Documents/Proyecto%20predeterminado/clasificador_monedas_3d.html
