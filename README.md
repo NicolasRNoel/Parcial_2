@@ -61,15 +61,15 @@ Para evitar que los 600 g detengan o deslicen el robot en la rampa, se implement
    * **En Plano (0°):** El ESP32 opera los motores al 50% - 60% PWM para ahorrar energía.
    * **En Pendiente ($\ge 15^\circ \text{ a } 30^\circ$):** Al detectar la inclinación, el algoritmo incrementa dinámicamente la modulación hasta el 90% - 100% PWM, asegurando la fuerza ascensional requerida para la carga de 100 g.
    * **En Descenso:** Se aplica un freno dinámico mediante PWM inverso para evitar caídas descontroladas.
-4. **Evasión de Obstáculos:**
-   * Sensores de distancia frontales le permiten al ESP32 rodear los muros y bloques de ladrillo del circuito sin colisionar.
-
+4. **Evasión de Obstáculos con Sensor Ultrasónico HC-SR04:**
+   * **Sensor Seleccionado:** Sensor Ultrasónico HC-SR04.
+   * Se eligió el HC-SR04 debido a su cono de detección angular (~15° a 30°), el cual permite identificar los muros y bloques de ladrillo de la pista incluso cuando el minitanque está inclinado sobre la rampa. Proporciona lecturas precisas a distancias de 2 cm a 400 cm con baja carga de procesamiento en el ESP32 y un consumo de corriente mínimo que cuida la autonomía de las baterías.
 ---
 
 ## 🖥️ Asistente de Voz
 
-* **Dashboard en Tiempo Real:** Visualización gráfica de la velocidad de la banda, conteo por denominación de moneda y estatus de navegación del minitanque.
-* **Chatbot NARRADOR de Voz:** Módulo interactivo que describe verbalmente el estado del proceso, la detección de obstáculos y la llegada exitosa a la meta.
+* **Dashboard en Tiempo Real:** Interfaz gráfica para visualizar el conteo de monedas por denominación, velocidad de la banda transportadora y métricas del sistema.
+* **Chatbot Narrador del Proyecto (Explicación por Voz):** Módulo interactivo con síntesis de voz que actúa como guía explicativo del sistema. Su función es **describir la arquitectura, objetivos, funcionamiento técnico y fases del proyecto** para usuarios o evaluadores. *(Nota: El chatbot no realiza narración de eventos en tiempo real ni telemetría en vivo; se enfoca exclusivamente en la divulgación y explicación conceptual del proyecto).*
 
 ---
 
@@ -81,5 +81,5 @@ Para evitar que los 600 g detengan o deslicen el robot en la rampa, se implement
 
 ---
 
-## 📌 Diagrama de Flujo del Proceso
+## 📌 Simualcion completa del proyecto final
 file:///D:/Documents/Proyecto%20predeterminado/clasificador_monedas_3d.html
